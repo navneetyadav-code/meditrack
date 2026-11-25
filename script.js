@@ -1,18 +1,12 @@
-
-// Get HTML elements
 const medicineForm = document.getElementById("medicineForm");
 const medicineList = document.getElementById("medicineList");
 
-// Store medicines
-let medicines = JSON.parse(localStorage.getItem("medicines")) || [];
+let medicines = [];
 
-// Add medicine
-medicineForm.addEventListener("submit", function(event) {
-
+medicineForm.addEventListener("submit", function (event) {
     event.preventDefault();
 
     const medicine = {
-        id: Date.now(),
         name: document.getElementById("medicineName").value.trim(),
         dosage: document.getElementById("dosage").value.trim(),
         timing: document.getElementById("timing").value,
@@ -22,119 +16,110 @@ medicineForm.addEventListener("submit", function(event) {
     };
 
     medicines.push(medicine);
-
-    saveMedicines();
-
+    displayMedicines();
     medicineForm.reset();
-
 });
 
-// Save data
-function saveMedicines() {
-
-    localStorage.setItem("medicines", JSON.stringify(medicines));
-
-    displayMedicines();
-
-}
-
-// Display medicines
 function displayMedicines() {
-
     medicineList.innerHTML = "";
 
-    medicines.sort((a, b) => {
-        const order = {
-            Morning: 1,
-            Afternoon: 2,
-            Night: 3
-        };
+    if (medicines.length === 0) {
+        medicineList.textContent = "No medicines added yet.";
+        updateDashboard();
+        return;
+    }
 
-        return order[a.timing] - order[b.timing];
+    const timingOrder = {
+        Morning: 1,
+        Afternoon: 2,
+        Night: 3
+    };
+
+    const sortedMedicines = medicines.slice().sort(function (first, second) {
+        return timingOrder[first.timing] - timingOrder[second.timing];
     });
 
-    medicines.forEach(function(medicine) {
+    sortedMedicines.forEach(function (medicine) {
+        const medicineCard = document.createElement("div");
+        medicineCard.className = "medicine-item";
 
-        const item = document.createElement("div");
+        const medicineDetails = document.createElement("div");
 
-        item.className = "medicine-item";
+        const name = document.createElement("h3");
+        name.textContent = medicine.name;
+        medicineDetails.appendChild(name);
 
-        item.innerHTML = `
-            <div>
-                <h3>${medicine.name}</h3>
+        const instructions = document.createElement("p");
+        instructions.textContent =
+            medicine.dosage + " | " + medicine.timing + " | " + medicine.meal;
+        medicineDetails.appendChild(instructions);
 
-                <p>
-                    ${medicine.dosage} |
-                    ${medicine.timing} |
-                    ${medicine.meal}
-                </p>
+        const stockMessage = document.createElement("p");
+        stockMessage.textContent = "Stock: ";
 
-                <p>
-                    Stock: <span class="${medicine.stock <= 5 ? "low-stock" : ""}">
-                    ${medicine.stock} tablets
-                    </span>
-                </p>
+        const stockCount = document.createElement("span");
+        stockCount.textContent = medicine.stock + " tablets";
 
-                ${medicine.stock <= 5
-                    ? '<p class="low-stock">⚠ Low stock! Refill reminder</p>'
-                    : ''}
-            </div>
+        if (medicine.stock <= 5) {
+            stockCount.className = "low-stock";
+        }
 
-            <div>
-                <label>
-                    <input
-                        type="checkbox"
-                        ${medicine.taken ? "checked" : ""}
-                        onchange="toggleMedicine(${medicine.id})"
-                    >
-                    Taken
-                </label>
-            </div>
-        `;
+        stockMessage.appendChild(stockCount);
+        medicineDetails.appendChild(stockMessage);
 
-        medicineList.appendChild(item);
+        if (medicine.stock <= 5) {
+            const refillReminder = document.createElement("p");
+            refillReminder.className = "low-stock";
+            refillReminder.textContent = "⚠ Low stock! Refill reminder";
+            medicineDetails.appendChild(refillReminder);
+        }
 
+        const takenLabel = document.createElement("label");
+        const takenCheckbox = document.createElement("input");
+        takenCheckbox.type = "checkbox";
+        takenCheckbox.checked = medicine.taken;
+        takenCheckbox.addEventListener("change", function () {
+            toggleMedicine(medicine);
+        });
+
+        takenLabel.appendChild(takenCheckbox);
+        takenLabel.appendChild(document.createTextNode(" Taken"));
+
+        medicineCard.appendChild(medicineDetails);
+        medicineCard.appendChild(takenLabel);
+        medicineList.appendChild(medicineCard);
     });
 
     updateDashboard();
-
 }
 
-// Mark medicine as taken or not taken
-function toggleMedicine(id) {
-
-    const medicine = medicines.find(m => m.id === id);
-
-    if (!medicine) return;
-
+function toggleMedicine(medicine) {
     medicine.taken = !medicine.taken;
 
-    if (medicine.taken) {
-        medicine.stock = Math.max(0, medicine.stock - 1);
-    } else {
+    if (medicine.taken && medicine.stock > 0) {
+        medicine.stock--;
+    } else if (!medicine.taken) {
         medicine.stock++;
     }
 
-    saveMedicines();
-
+    displayMedicines();
 }
 
-// Update dashboard numbers
 function updateDashboard() {
+    let takenMedicines = 0;
+    let totalStock = 0;
 
-    const total = medicines.length;
+    for (let i = 0; i < medicines.length; i++) {
+        if (medicines[i].taken) {
+            takenMedicines++;
+        }
 
-    const taken = medicines.filter(m => m.taken).length;
+        totalStock += medicines[i].stock;
+    }
 
-    const stock = medicines.reduce((sum, m) => sum + m.stock, 0);
-
-    document.getElementById("totalMedicines").innerText = total;
-
-    document.getElementById("takenMedicines").innerText = taken;
-
-    document.getElementById("totalStock").innerText = stock;
-
+    document.getElementById("totalMedicines").textContent = medicines.length;
+    document.getElementById("takenMedicines").textContent = takenMedicines;
+    document.getElementById("totalStock").textContent = totalStock;
 }
 
-// Load saved medicines when page opens
 displayMedicines();
